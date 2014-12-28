@@ -1,0 +1,35 @@
+- name: setup nginx
+  apt: name=nginx state=present
+
+- name: setup git
+  apt: name=git state=present
+
+- name: npm repo add
+  apt_repository: repo='ppa:chris-lea/node.js' state=present update_cache=yes
+
+- name: Install kibana dependencies
+  apt: name={{ item }} state=latest update_cache=yes
+  with_items:
+      - nodejs
+
+- name: clone Kibana
+  git: repo=git@github.com:elasticsearch/kibana.git dest=/usr/share/nginx/html/kibana version=v3.1.2 accept_hostkey=yes 
+
+- name: do the installation magic
+  command: 'bash -c "cd /usr/share/nginx/html/kibana && npm install && npm install -g grunt-cli && grunt && grunt build"'
+
+- name: do more installation magic
+  command: 'bash -c "cd /usr/share/nginx/html/kibana && grunt release --force"'
+
+- name: kibana config
+  template: src=kibana/config.js dest=/usr/share/nginx/html/kibana/src/config.js owner=root group=root mode=0644
+
+- name: nginx site config for kibana
+  template: src=kibana/nginx-kibana dest=/etc/nginx/sites-available/kibana owner=root group=root mode=0644
+
+- name: enable the config
+  file: state=link src=/etc/nginx/sites-available/kibana dest=/etc/nginx/sites-enabled/kibana
+  notify: reload nginx
+
+- name: basic auth
+  template: src=kibana/htpasswd.kibana dest=/etc/nginx/htpasswd.kibana owner=root group=root mode=0644
